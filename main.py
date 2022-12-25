@@ -19,20 +19,23 @@ def locate_center(image):
         return None
 
 
-def close_roblox():
+def get_roblox_pid():
     running_apps = psutil.process_iter(['pid', 'name'])
-    closed = False
     for app in running_apps:
         try:
             if app.name().lower().startswith('roblox'):
-                os.kill(app.pid, 9)
-                print('Killed roblox', app.pid)
-                closed = True
-            else:
-                pass
+                return app.pid
         except psutil.Error:
             pass
-    return closed
+    return None
+
+
+def close_roblox():
+    pid = get_roblox_pid()
+    if not pid:
+        return False
+    os.kill(pid, 9)
+    return True
 
 
 def open_roblox():
@@ -42,9 +45,16 @@ def open_roblox():
     pyautogui.click(x, y)
 
 
+reconnecting = False
+
+
 def disconnect_check():
-    if pyautogui.locateCenterOnScreen('assets/disconnected.png'):
+    global reconnecting
+    if reconnecting:
+        return
+    if pyautogui.locateCenterOnScreen('assets/disconnected.png') or get_roblox_pid() is None:
         print('Disconnected')
+        reconnecting = True
         loc = locate_center('assets/reconnect.png')
         if loc:
             x, y = loc[0] / pixelRatio, loc[1] / pixelRatio
@@ -56,10 +66,10 @@ def disconnect_check():
             else:
                 print('Could not find roblox')
             open_roblox()
+        print('Opened roblox')
+        reconnecting = False
 
 
-# while True:
-#     disconnect_check()
-#     time.sleep(1)
-
-open_roblox()
+while True:
+    disconnect_check()
+    time.sleep(1)
