@@ -1,0 +1,7 @@
+pyautogui
+psutil
+pydirectinput
+python-imagesearch
+pillow
+pywinauto
+pynput
