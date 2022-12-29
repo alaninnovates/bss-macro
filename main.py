@@ -35,82 +35,85 @@ def locate_center(image):
         return None
 
 
-def find_image(image):
-    s = imagesearch(image)
+def find_image(image, precision=0.8):
+    s = imagesearch(image, precision)
     if s[0] == -1 or s[1] == -1:
         return None
     return s
 
 
-def get_roblox_pid():
-    running_apps = psutil.process_iter(['pid', 'name'])
-    for app in running_apps:
-        try:
-            if app.name().lower().startswith('roblox'):
-                return app.pid
-        except psutil.Error:
-            pass
-    return None
+class DisconnectManager:
+    def __init__(self):
+        self.connected = False
+        self.is_reconnecting = False
 
+    def get_roblox_pid(self):
+        running_apps = psutil.process_iter(['pid', 'name'])
+        for app in running_apps:
+            try:
+                if app.name().lower().startswith('roblox'):
+                    return app.pid
+            except psutil.Error:
+                pass
+        return None
 
-def close_roblox():
-    pid = get_roblox_pid()
-    if not pid:
-        return False
-    os.kill(pid, 9)
-    return True
+    def is_connected(self):
+        return bool(find_image('assets/sprinkler.png')) and bool(self.get_roblox_pid())
 
+    def close_roblox(self):
+        pid = self.get_roblox_pid()
+        if not pid:
+            return False
+        os.kill(pid, 9)
+        return True
 
-def open_roblox():
-    webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
-    time.sleep(10)
-    x, y = imagesearch('assets/playbutton.png')
-    pyautogui.click(x, y)
+    def open_roblox(self):
+        webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
+        time.sleep(10)
+        x, y = imagesearch('assets/playbutton.png')
+        pyautogui.click(x, y)
 
+    def activate_roblox(self):
+        pid = self.get_roblox_pid()
+        if sys.platform.startswith("win"):
+            w = pywinauto.Application().connect(process=pid).top_window()
+            w.minimize()
+            w.maximize()
+            w.set_focus()
+        # todo: mac
 
-def activate_roblox():
-    pid = get_roblox_pid()
-    if sys.platform.startswith("win"):
-        w = pywinauto.Application().connect(process=pid).top_window()
-        w.minimize()
-        w.maximize()
-        w.set_focus()
-    # todo: mac
-
-
-connected = False
-is_reconnecting = False
-
-
-def disconnect_check():
-    global connected, is_reconnecting
-    if is_reconnecting:
-        return
-    if get_roblox_pid():
-        connected = True
-    if find_image('assets/disconnected.png') or get_roblox_pid() is None:
-        print('Disconnected')
-        is_reconnecting = True
-        loc = find_image('assets/reconnect.png')
-        if loc:
-            x, y = loc[0], loc[1]
-            pyautogui.click(x, y)
-            print(f'Clicked Reconnect ({x}, {y})')
-        else:
-            if close_roblox():
-                print('Closed roblox')
+    def disconnect_check(self):
+        if self.is_reconnecting:
+            return
+        if self.is_connected():
+            self.connected = True
+        print(find_image('assets/disconnected.png'), self.is_connected())
+        if find_image('assets/disconnected.png') or not self.is_connected():
+            print('Disconnected')
+            self.is_reconnecting = True
+            loc = find_image('assets/reconnect.png')
+            if loc:
+                x, y = loc[0], loc[1]
+                pyautogui.click(x, y)
+                print(f'Clicked Reconnect ({x}, {y})')
             else:
-                print('Could not find roblox')
-            open_roblox()
-        print('Opened roblox')
-        while not get_roblox_pid():
-            time.sleep(0.1)
-        # wait for game to load
-        time.sleep(60)
-        activate_roblox()
-        claim_hive_slot()
-        is_reconnecting = False
-        connected = True
+                if self.close_roblox():
+                    print('Closed roblox')
+                else:
+                    print('Could not find roblox')
+                self.open_roblox()
+            print('Opened roblox')
+            while not self.is_connected():
+                time.sleep(0.5)
+            # wait for game to load
+            time.sleep(60)
+            self.activate_roblox()
+            claim_hive_slot()
+            self.is_reconnecting = False
+            self.connected = True
+
+
+disconnect_manager = DisconnectManager()
 
 
 def key_press(key, duration=0):
@@ -148,26 +151,19 @@ def zoom_in(times=1):
         key_press("i")
 
 
-# there are many cases here - some do not work
-# todo: fix everything!
 def face_hive(enable):
-    for _ in range(4):
-        for _ in range(2):
+    for _ in range(2):
+        for _ in range(4):
+            print(find_image("assets/hivecomb.png"))
             if find_image("assets/hivecomb.png"):
-                if enable:
-                    rotate_camera(4)
-                return
-            zoom_out()
-            found_g = find_image("assets/hivegift.png")
-            zoom_in()
-            if found_g:
                 if enable:
                     rotate_camera(4)
                 return
             rotate_camera(4)
             time.sleep(1)
         reset()
-    # client frozen
+        time.sleep(8)
+    # client frozen probs
 
 
 def go_to_cannon():
@@ -185,36 +181,37 @@ def reset():
     key_press("enter")
 
 
+# todo: lag affects this a TON. it can land in different places every time
 def go_to_pine_tree():
     time.sleep(0.8)
     key_press("space")
     key_press("space")
-    pdx.keyDown("sd")
+    pdx.keyDown("d")
     pdx.keyDown("s")
     time.sleep(3)
     pdx.keyUp("s")
-    time.sleep(1.6)
+    time.sleep(1.8)
     pdx.keyUp("d")
     key_press("space")
 
 
 def farm_e_lol():
+    pdx.mouseDown()
     for i in range(2):
-        key_press("w", 1)
+        key_press("w", 0.72)
         key_press("a", 0.1)
-        key_press("s", 1)
+        key_press("s", 0.72)
         key_press("a", 0.1)
     for i in range(2):
-        key_press("w", 1)
+        key_press("w", 0.72)
         key_press("d", 0.1)
-        key_press("s", 1)
+        key_press("s", 0.72)
         key_press("d", 0.1)
 
 
 def main_loop():
-    global connected
     threading.Thread(target=disconnect_loop).start()
-    while not connected:
+    while not disconnect_manager.connected:
         time.sleep(0.1)
     time.sleep(1)
     reset()
@@ -242,7 +239,7 @@ def main_loop():
 def disconnect_loop():
     while True:
         print("Checking")
-        disconnect_check()
+        disconnect_manager.disconnect_check()
         time.sleep(1)
 
 
