@@ -5,3 +5,4 @@ python-imagesearch
 pillow
 pywinauto
 pynput
+requests

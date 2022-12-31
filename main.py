@@ -1,12 +1,16 @@
+import multiprocessing
 import os
 import signal
 import sys
-import threading
 import webbrowser
 import time
 
+import tkinter as tk
+
 import pyautogui
 from python_imagesearch.imagesearch import imagesearch
+
+import webhook
 
 if sys.platform.startswith("win"):
     import pydirectinput as pdx
@@ -16,6 +20,10 @@ else:
 
 import psutil
 from pynput import keyboard
+
+
+webhook_client = webhook.WebhookClient(url="https://discord.com/api/webhooks/1058279840400289833"
+                                           "/rA_QhX9_TxIY3cBqbRNydTlr8ijyXMpPhjZKK5uQBu0AbbmCFrTMY2RjQIzUGjWzw7Ll")
 
 
 def exit_macro():
@@ -164,6 +172,7 @@ def face_hive(enable):
         reset()
         time.sleep(8)
     # client frozen probs
+    print("Face_hive done")
 
 
 def go_to_cannon():
@@ -183,6 +192,7 @@ def reset():
 
 # todo: lag affects this a TON. it can land in different places every time
 def go_to_pine_tree():
+    webhook_client.send_embed(description="Going to field: Pine Tree", color=0xff0000)
     time.sleep(0.8)
     key_press("space")
     key_press("space")
@@ -209,31 +219,37 @@ def farm_e_lol():
         key_press("d", 0.1)
 
 
-def main_loop():
-    threading.Thread(target=disconnect_loop).start()
-    while not disconnect_manager.connected:
-        time.sleep(0.1)
-    time.sleep(1)
-    reset()
-    time.sleep(8)
-    face_hive(True)
-    time.sleep(8)
-    zoom_out(5)
-    time.sleep(1)
-    go_to_cannon()
-    key_press("e")
-    go_to_pine_tree()
-    time.sleep(1)
-    # place sprinkler
-    key_press("1")
-    rotate_camera(6)
-    start_farm_time = time.time()
+def field_drift_compensation():
+    pass
+
+
+def macro_sequence():
     while True:
-        farm_e_lol()
-        # 30 seconds
-        if time.time() - start_farm_time == 30:
-            break
-    print('Wow')
+        reset()
+        time.sleep(8)
+        face_hive(True)
+        print("Face_hive continue in main")
+        time.sleep(8)
+        zoom_out(5)
+        time.sleep(1)
+        go_to_cannon()
+        key_press("e")
+        go_to_pine_tree()
+        time.sleep(1)
+        # place sprinkler
+        key_press("1")
+        rotate_camera(6)
+        webhook_client.send_embed(description="Gathering", color=0xff0000)
+        start_farm_time = time.time()
+        while True:
+            farm_e_lol()
+            field_drift_compensation()
+            # 30 seconds
+            print(time.time(), time.time() - start_farm_time)
+            if time.time() - start_farm_time >= 30:
+                break
+        pdx.mouseUp()
+        webhook_client.send_embed(description="Returning to hive", color=0xff0000)
 
 
 def disconnect_loop():
@@ -243,21 +259,44 @@ def disconnect_loop():
         time.sleep(1)
 
 
-def watch_for_quit():
+def run_macro():
+    # todo: make the seq_proc restart after a disconnect
+    seq_proc = multiprocessing.Process(target=macro_sequence)
+    seq_proc.start()
+    dc_proc = multiprocessing.Process(target=disconnect_loop)
+    dc_proc.start()
+    while True:
+        if not disconnect_manager.connected:
+            seq_proc.kill()
+        time.sleep(0.1)
+
+
+def watch_for_hotkeys():
     def on_press(key):
-        if key != keyboard.Key.f3:
-            return
-        print("Exiting")
-        exit_macro()
+        if key == keyboard.Key.f3:
+            print("Exiting")
+            webhook_client.send_embed(description="Exiting macro", color=0xff0000)
+            exit_macro()
+        elif key == keyboard.Key.f1:
+            print("Running macro")
+            webhook_client.send_embed(description="Running macro", color=0xff0000)
+            run_macro()
 
     keyboard.Listener(on_press=on_press).start()
 
 
+def gui():
+    root = tk.Tk()
+    tk.Label(root, text="Hello").pack()
+    root.mainloop()
+
+
 if __name__ == "__main__":
     try:
-        print("Starting macro.")
-        watch_for_quit()
-        main_loop()
+        print("Starting macro")
+        webhook_client.send_embed(description="Starting macro gui", color=0xff0000)
+        watch_for_hotkeys()
+        gui()
     except KeyboardInterrupt:
-        print("Macro stopped.")
+        print("Macro stopped")
         exit_macro()
