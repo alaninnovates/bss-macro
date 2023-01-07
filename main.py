@@ -412,11 +412,9 @@ def gui():
 if __name__ == "__main__":
     try:
         print("Starting macro")
-        # webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
-        # watch_for_hotkeys()
-        # gui()
-        key_press("e")
-        go_to_field("Pineapple")
+        webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
+        watch_for_hotkeys()
+        gui()
         # field_drift_compensation()
     except KeyboardInterrupt:
         print("Macro stopped")
