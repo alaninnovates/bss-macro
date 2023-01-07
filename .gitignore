@@ -1,2 +1,5 @@
 venv
 __pycache__
+monitor-*.png
+.DS_Store
+macro-settings.json

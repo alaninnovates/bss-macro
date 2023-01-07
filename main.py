@@ -1,15 +1,19 @@
 import multiprocessing
 import os
+import re
 import signal
 import sys
+import typing
 import webbrowser
 import time
 
 import tkinter as tk
 
+import mss
 import pyautogui
 from python_imagesearch.imagesearch import imagesearch
 
+import settings
 import webhook
 
 if sys.platform.startswith("win"):
@@ -22,25 +26,8 @@ import psutil
 from pynput import keyboard
 
 
-webhook_client = webhook.WebhookClient(url="https://discord.com/api/webhooks/1058279840400289833"
-                                           "/rA_QhX9_TxIY3cBqbRNydTlr8ijyXMpPhjZKK5uQBu0AbbmCFrTMY2RjQIzUGjWzw7Ll")
-
-
 def exit_macro():
     os.kill(os.getpid(), signal.SIGTERM)
-
-
-pixelRatio = pyautogui.screenshot().size[0] / pyautogui.size().width
-
-
-# todo: maybe use imagesearch
-def locate_center(image):
-    loc = pyautogui.locateCenterOnScreen(image)
-    if loc:
-        x, y = loc[0] / pixelRatio, loc[1] / pixelRatio
-        return x, y
-    else:
-        return None
 
 
 def find_image(image, precision=0.8):
@@ -66,7 +53,7 @@ class DisconnectManager:
         return None
 
     def is_connected(self):
-        return bool(find_image('assets/sprinkler.png')) and bool(self.get_roblox_pid())
+        return bool(find_image('assets/sprinkler2.png')) and bool(self.get_roblox_pid())
 
     def close_roblox(self):
         pid = self.get_roblox_pid()
@@ -76,10 +63,13 @@ class DisconnectManager:
         return True
 
     def open_roblox(self):
-        webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
-        time.sleep(10)
-        x, y = imagesearch('assets/playbutton.png')
-        pyautogui.click(x, y)
+        # webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
+        # time.sleep(10)
+        # x, y = imagesearch('assets/playbutton.png')
+        # pyautogui.click(x, y)
+        # webbrowser.open(
+        #     'https://www.roblox.com/games/1537690962/x2-Event-Bee-Swarm-Simulator?privateServerLinkCode=54294896913853942846549719787777')
+        webbrowser.open(settings.get_setting('vip_url'))
 
     def activate_roblox(self):
         pid = self.get_roblox_pid()
@@ -88,7 +78,9 @@ class DisconnectManager:
             w.minimize()
             w.maximize()
             w.set_focus()
-        # todo: mac
+        elif sys.platform.startswith('darwin'):
+            os.system("oascript -e 'activate application \"Roblox\"'")
+            time.sleep(0.5)
 
     def disconnect_check(self):
         if self.is_reconnecting:
@@ -111,11 +103,11 @@ class DisconnectManager:
                     print('Could not find roblox')
                 self.open_roblox()
             print('Opened roblox')
+            while not self.get_roblox_pid():
+                time.sleep(0.5)
+            self.activate_roblox()
             while not self.is_connected():
                 time.sleep(0.5)
-            # wait for game to load
-            time.sleep(60)
-            self.activate_roblox()
             claim_hive_slot()
             self.is_reconnecting = False
             self.connected = True
@@ -124,14 +116,14 @@ class DisconnectManager:
 disconnect_manager = DisconnectManager()
 
 
-def key_press(key, duration=0):
+def key_press(key, duration: float = 0):
     pdx.keyDown(key)
     time.sleep(duration)
     pdx.keyUp(key)
 
 
 def is_e_on_screen():
-    s = imagesearch('assets/e.png')
+    s = imagesearch('assets/e2.png')
     return not (s[0] == -1 or s[1] == -1)
 
 
@@ -166,20 +158,23 @@ def face_hive(enable):
             if find_image("assets/hivecomb.png"):
                 if enable:
                     rotate_camera(4)
+                print("Face_hive done")
                 return
             rotate_camera(4)
             time.sleep(1)
         reset()
         time.sleep(8)
     # client frozen probs
-    print("Face_hive done")
 
 
 def go_to_cannon():
     key_press("w", 1)
     key_press("d", 10)
     key_press("space")
-    key_press("d", 1.2)
+    pdx.keyDown("d")
+    while not is_e_on_screen():
+        time.sleep(0.1)
+    pdx.keyUp("d")
 
 
 def reset():
@@ -190,19 +185,23 @@ def reset():
     key_press("enter")
 
 
-# todo: lag affects this a TON. it can land in different places every time
 def go_to_pine_tree():
-    webhook_client.send_embed(description="Going to field: Pine Tree", color=0xff0000)
-    time.sleep(0.8)
+    time.sleep(0.4)
     key_press("space")
     key_press("space")
     pdx.keyDown("d")
     pdx.keyDown("s")
     time.sleep(3)
     pdx.keyUp("s")
-    time.sleep(1.8)
+    time.sleep(1.7)
     pdx.keyUp("d")
     key_press("space")
+
+
+def go_to_field(field):
+    webhook.send_embed(settings.get_setting('webhook_url'), description=f"Going to field: {field}", color=0xff0000)
+    if field == "Pine Tree":
+        go_to_pine_tree()
 
 
 def farm_e_lol():
@@ -219,37 +218,81 @@ def farm_e_lol():
         key_press("d", 0.1)
 
 
+screen = mss.mss()
+
+
 def field_drift_compensation():
+    # this func doesn't work atm
     pass
+    # goal: make saturator in center of screen
+    # use wasd keys to position camera
+    for _ in range(5):
+        saturator_pos = find_image("assets/saturator.png", 0.5)
+        if not saturator_pos:
+            break
+        saturator_x, saturator_y = saturator_pos[0], saturator_pos[1]
+        # window_width, window_height = screen.monitors[0]["width"], screen.monitors[0]["height"]
+        window_width, window_height = 1920, 1080
+        print(saturator_x, saturator_y, window_width, window_height)
+        win_up = window_height / 2.14
+        win_down = window_height / 1.88
+        win_left = window_width / 2.14
+        win_right = window_width / 1.88
+        if win_left <= saturator_x <= win_right and win_up <= saturator_y <= win_down:
+            print("Saturator in center")
+            break
+        if saturator_x < win_left:
+            pdx.keyDown("a")
+        elif saturator_x > win_right:
+            pdx.keyDown("d")
+        if saturator_y < win_up:
+            pdx.keyDown("w")
+        elif saturator_y > win_down:
+            pdx.keyDown("s")
+        time.sleep(0.2)
+        pdx.keyUp("a")
+        pdx.keyUp("d")
+        pdx.keyUp("w")
+        pdx.keyUp("s")
+
+
+def convert_if_possible():
+    if not is_e_on_screen():
+        return
+    key_press("e")
+    time.sleep(1)
+    while is_e_on_screen():
+        time.sleep(1)
 
 
 def macro_sequence():
+    print("Starting macro sequence")
     while True:
         reset()
         time.sleep(8)
         face_hive(True)
         print("Face_hive continue in main")
-        time.sleep(8)
         zoom_out(5)
+        convert_if_possible()
         time.sleep(1)
         go_to_cannon()
         key_press("e")
-        go_to_pine_tree()
+        go_to_field("Pine Tree")
         time.sleep(1)
         # place sprinkler
         key_press("1")
         rotate_camera(6)
-        webhook_client.send_embed(description="Gathering", color=0xff0000)
+        webhook.send_embed(settings.get_setting('webhook_url'), description="Gathering", color=0xff0000)
         start_farm_time = time.time()
+        gather_time_limit = settings.get_setting('gather_time') * 60
         while True:
             farm_e_lol()
-            field_drift_compensation()
-            # 30 seconds
+            # field_drift_compensation()
             print(time.time(), time.time() - start_farm_time)
-            if time.time() - start_farm_time >= 30:
+            if time.time() - start_farm_time >= gather_time_limit:
                 break
         pdx.mouseUp()
-        webhook_client.send_embed(description="Returning to hive", color=0xff0000)
+        webhook.send_embed(settings.get_setting('webhook_url'), description="Returning to hive", color=0xff0000)
 
 
 def disconnect_loop():
@@ -262,9 +305,9 @@ def disconnect_loop():
 def run_macro():
     # todo: make the seq_proc restart after a disconnect
     seq_proc = multiprocessing.Process(target=macro_sequence)
-    seq_proc.start()
+    seq_proc.run()
     dc_proc = multiprocessing.Process(target=disconnect_loop)
-    dc_proc.start()
+    dc_proc.run()
     while True:
         if not disconnect_manager.connected:
             seq_proc.kill()
@@ -272,31 +315,80 @@ def run_macro():
 
 
 def watch_for_hotkeys():
+    is_running = False
+    run_proc: typing.Optional[multiprocessing.Process] = None
+
     def on_press(key):
+        nonlocal run_proc, is_running
+        print(key)
         if key == keyboard.Key.f3:
             print("Exiting")
-            webhook_client.send_embed(description="Exiting macro", color=0xff0000)
+            webhook.send_embed(settings.get_setting('webhook_url'), description="Exiting macro", color=0xff0000)
+            if run_proc:
+                run_proc.kill()
             exit_macro()
         elif key == keyboard.Key.f1:
+            if is_running:
+                print("Macro already running")
+                return
             print("Running macro")
-            webhook_client.send_embed(description="Running macro", color=0xff0000)
-            run_macro()
+            webhook.send_embed(settings.get_setting('webhook_url'), description="Running macro", color=0xff0000)
+            run_proc = multiprocessing.Process(target=run_macro)
+            run_proc.start()
+            is_running = True
 
     keyboard.Listener(on_press=on_press).start()
 
 
+class ValidatedEntry(tk.Entry):
+    def __init__(self, master, vcmd, setting_name: str, setting_var: tk.Variable, **kwargs):
+        self.vcmd = (master.register(vcmd), '%P')
+        self.setting_var = setting_var
+        self.setting_var.set(settings.get_setting(setting_name))
+        self.setting_var.trace_add("write", lambda *args: settings.set_setting(setting_name, self.setting_var.get()))
+        super().__init__(master, textvariable=self.setting_var, validate="key", validatecommand=self.vcmd, **kwargs)
+
+
+def is_int(p):
+    try:
+        int(p)
+        return True
+    except ValueError:
+        return False
+
+
+vip_regex = r"^((http(s)?):\/\/)?((www|web)\.)?roblox\.com\/games\/(1537690962|4189852503)\/?([" \
+            r"^\/]*)\?privateServerLinkCode=.{32}(\&[^\/]*)*$"
+
+
+def validate_vip(p):
+    pattern = re.compile(vip_regex)
+    return pattern.match(p) is not None
+
+
 def gui():
     root = tk.Tk()
-    tk.Label(root, text="Hello").pack()
+    vip_url = tk.StringVar()
+    webhook_url = tk.StringVar()
+    gather_time = tk.IntVar()
+    root.geometry("300x300")
+    root.title("Stumpy Macro")
+    tk.Label(root, text="Vip Server:").pack()
+    ValidatedEntry(root, validate_vip, "vip_url", vip_url).pack()
+    tk.Label(root, text="Webhook URL:").pack()
+    ValidatedEntry(root, lambda p: p == "" or p.startswith("http"), "webhook_url", webhook_url).pack()
+    tk.Label(root, text="Gather time (mins):").pack()
+    ValidatedEntry(root, lambda p: p != "" and is_int(p), "gather_time", gather_time).pack()
     root.mainloop()
 
 
 if __name__ == "__main__":
     try:
         print("Starting macro")
-        webhook_client.send_embed(description="Starting macro gui", color=0xff0000)
+        webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
         watch_for_hotkeys()
         gui()
+        # field_drift_compensation()
     except KeyboardInterrupt:
         print("Macro stopped")
         exit_macro()

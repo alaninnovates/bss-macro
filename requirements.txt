@@ -1,8 +1,9 @@
-pyautogui
-psutil
-pydirectinput
+pyautogui~=0.9.53
+psutil~=5.9.4
+pydirectinput~=1.0.4
 python-imagesearch
 pillow
-pywinauto
-pynput
-requests
+pywinauto~=0.6.6
+pynput~=1.7.6
+requests~=2.28.1
+mss~=7.0.1
