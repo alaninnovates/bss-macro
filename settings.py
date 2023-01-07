@@ -1,12 +1,13 @@
 import json
 import os
 
-
 default_settings = {
-        "webhook_url": "",
-        "vip_url": "https://www.roblox.com/games/4189852503?privateServerLinkCode=94175309348158422142147035472390",
-        "gather_time": 9,
-    }
+    "webhook_url": "",
+    "vip_url": "https://www.roblox.com/games/4189852503?privateServerLinkCode=94175309348158422142147035472390",
+    "gather_time": 9,
+    "field": "Pine Tree",
+    "pattern": "E_lol"
+}
 
 
 def read_settings():

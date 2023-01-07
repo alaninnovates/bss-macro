@@ -196,12 +196,40 @@ def go_to_pine_tree():
     time.sleep(1.7)
     pdx.keyUp("d")
     key_press("space")
+    rotate_camera(6)
+
+
+def go_to_stump():
+    time.sleep(1.7)
+    key_press("space")
+    key_press("space")
+    pdx.keyDown("a")
+    time.sleep(4)
+    pdx.keyUp("a")
+    rotate_camera(2)
+    key_press("w", 0.8)
+
+
+def go_to_pineapple():
+    time.sleep(1.7)
+    key_press("space")
+    key_press("space")
+    pdx.keyDown("a")
+    time.sleep(2.5)
+    pdx.keyUp("a")
+    key_press("space")
+    rotate_camera(4)
+    key_press("w", 1)
 
 
 def go_to_field(field):
     webhook.send_embed(settings.get_setting('webhook_url'), description=f"Going to field: {field}", color=0xff0000)
     if field == "Pine Tree":
         go_to_pine_tree()
+    elif field == "Stump":
+        go_to_stump()
+    elif field == "Pineapple":
+        go_to_pineapple()
 
 
 def farm_e_lol():
@@ -277,11 +305,10 @@ def macro_sequence():
         time.sleep(1)
         go_to_cannon()
         key_press("e")
-        go_to_field("Pine Tree")
+        go_to_field(settings.get_setting('field'))
         time.sleep(1)
         # place sprinkler
         key_press("1")
-        rotate_camera(6)
         webhook.send_embed(settings.get_setting('webhook_url'), description="Gathering", color=0xff0000)
         start_farm_time = time.time()
         gather_time_limit = settings.get_setting('gather_time') * 60
@@ -385,9 +412,11 @@ def gui():
 if __name__ == "__main__":
     try:
         print("Starting macro")
-        webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
-        watch_for_hotkeys()
-        gui()
+        # webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
+        # watch_for_hotkeys()
+        # gui()
+        key_press("e")
+        go_to_field("Pineapple")
         # field_drift_compensation()
     except KeyboardInterrupt:
         print("Macro stopped")
