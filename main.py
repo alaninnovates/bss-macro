@@ -1,3 +1,4 @@
+import datetime
 import multiprocessing
 import os
 import re
@@ -13,8 +14,10 @@ import mss
 import pyautogui
 from python_imagesearch.imagesearch import imagesearch
 
+import paths
 import settings
 import webhook
+from util import key_press, find_image, rotate_camera, zoom_out, is_int
 
 if sys.platform.startswith("win"):
     import pydirectinput as pdx
@@ -28,13 +31,6 @@ from pynput import keyboard
 
 def exit_macro():
     os.kill(os.getpid(), signal.SIGTERM)
-
-
-def find_image(image, precision=0.8):
-    s = imagesearch(image, precision)
-    if s[0] == -1 or s[1] == -1:
-        return None
-    return s
 
 
 class DisconnectManager:
@@ -116,10 +112,37 @@ class DisconnectManager:
 disconnect_manager = DisconnectManager()
 
 
-def key_press(key, duration: float = 0):
-    pdx.keyDown(key)
-    time.sleep(duration)
-    pdx.keyUp(key)
+class TimeManager:
+    def __init__(self):
+        self.macro_start_time = time.time()
+        self.has_done_mondo = True
+        self.has_done_clock = False
+
+    def start(self):
+        self.macro_start_time = time.time()
+        while True:
+            if datetime.time.minute == 0:
+                self.has_done_mondo = False
+            # 65 mins so we have some extra time
+            if time.time() - self.macro_start_time > 65 * 60:
+                self.has_done_clock = False
+                self.macro_start_time = time.time()
+            time.sleep(1)
+
+    def needs_do_mondo(self):
+        return not self.has_done_mondo
+
+    def did_mondo(self):
+        self.has_done_mondo = True
+
+    def needs_do_clock(self):
+        return not self.has_done_clock
+
+    def did_clock(self):
+        self.has_done_clock = True
+
+
+time_manager = TimeManager()
 
 
 def is_e_on_screen():
@@ -133,22 +156,6 @@ def claim_hive_slot():
     while not is_e_on_screen():
         key_press("a", 0.3)
     key_press("e")
-
-
-def rotate_camera(times=1):
-    camera_rotation_loops = abs(times) % 8
-    for _ in range(camera_rotation_loops):
-        key_press(times > 0 and "," or ".")
-
-
-def zoom_out(times=1):
-    for _ in range(times):
-        key_press("o")
-
-
-def zoom_in(times=1):
-    for _ in range(times):
-        key_press("i")
 
 
 def face_hive(enable):
@@ -185,53 +192,6 @@ def reset():
     key_press("enter")
 
 
-def go_to_pine_tree():
-    time.sleep(0.4)
-    key_press("space")
-    key_press("space")
-    pdx.keyDown("d")
-    pdx.keyDown("s")
-    time.sleep(3)
-    pdx.keyUp("s")
-    time.sleep(1.7)
-    pdx.keyUp("d")
-    key_press("space")
-    rotate_camera(6)
-
-
-def go_to_stump():
-    time.sleep(1.7)
-    key_press("space")
-    key_press("space")
-    pdx.keyDown("a")
-    time.sleep(4)
-    pdx.keyUp("a")
-    rotate_camera(2)
-    key_press("w", 0.8)
-
-
-def go_to_pineapple():
-    time.sleep(1.7)
-    key_press("space")
-    key_press("space")
-    pdx.keyDown("a")
-    time.sleep(2.5)
-    pdx.keyUp("a")
-    key_press("space")
-    rotate_camera(4)
-    key_press("w", 1)
-
-
-def go_to_field(field):
-    webhook.send_embed(settings.get_setting('webhook_url'), description=f"Going to field: {field}", color=0xff0000)
-    if field == "Pine Tree":
-        go_to_pine_tree()
-    elif field == "Stump":
-        go_to_stump()
-    elif field == "Pineapple":
-        go_to_pineapple()
-
-
 def farm_e_lol():
     pdx.mouseDown()
     for i in range(2):
@@ -244,6 +204,37 @@ def farm_e_lol():
         key_press("d", 0.1)
         key_press("s", 0.72)
         key_press("d", 0.1)
+
+
+def do_mondo():
+    time.sleep(1.2)
+    key_press("space")
+    key_press("space")
+    pdx.keyDown("s")
+    time.sleep(0.8)
+    pdx.keyUp("s")
+    key_press("space")
+    time.sleep(1.5)
+    key_press("a", 1.8)
+    key_press("d", 2.4)
+    key_press("a", 0.6)
+    # 2 mins
+    time.sleep(2 * 60)
+
+
+def do_clock():
+    time.sleep(1)
+    key_press("space")
+    key_press("space")
+    pdx.keyDown("a")
+    pdx.keyDown("w")
+    time.sleep(5)
+    pdx.keyUp("w")
+    time.sleep(1)
+    pdx.keyUp("a")
+    key_press("d", 1.5)
+    key_press("a", 1.5)
+    key_press("e")
 
 
 screen = mss.mss()
@@ -305,7 +296,17 @@ def macro_sequence():
         time.sleep(1)
         go_to_cannon()
         key_press("e")
-        go_to_field(settings.get_setting('field'))
+        if time_manager.needs_do_mondo():
+            do_mondo()
+            time_manager.did_mondo()
+            continue
+        if time_manager.needs_do_clock():
+            do_clock()
+            time_manager.did_clock()
+            continue
+        field = settings.get_setting('field')
+        webhook.send_embed(settings.get_setting('webhook_url'), description=f"Going to field: {field}", color=0xff0000)
+        paths.go_to_field(field)
         time.sleep(1)
         # place sprinkler
         key_press("1")
@@ -376,14 +377,6 @@ class ValidatedEntry(tk.Entry):
         super().__init__(master, textvariable=self.setting_var, validate="key", validatecommand=self.vcmd, **kwargs)
 
 
-def is_int(p):
-    try:
-        int(p)
-        return True
-    except ValueError:
-        return False
-
-
 vip_regex = r"^((http(s)?):\/\/)?((www|web)\.)?roblox\.com\/games\/(1537690962|4189852503)\/?([" \
             r"^\/]*)\?privateServerLinkCode=.{32}(\&[^\/]*)*$"
 
@@ -395,17 +388,21 @@ def validate_vip(p):
 
 def gui():
     root = tk.Tk()
+    root.geometry("300x300")
+    root.title("Stumpy Macro")
     vip_url = tk.StringVar()
     webhook_url = tk.StringVar()
     gather_time = tk.IntVar()
-    root.geometry("300x300")
-    root.title("Stumpy Macro")
+    field = tk.StringVar()
     tk.Label(root, text="Vip Server:").pack()
     ValidatedEntry(root, validate_vip, "vip_url", vip_url).pack()
     tk.Label(root, text="Webhook URL:").pack()
     ValidatedEntry(root, lambda p: p == "" or p.startswith("http"), "webhook_url", webhook_url).pack()
     tk.Label(root, text="Gather time (mins):").pack()
     ValidatedEntry(root, lambda p: p != "" and is_int(p), "gather_time", gather_time).pack()
+    tk.Label(root, text="Field:").pack()
+    tk.OptionMenu(root, field, "Pine Tree", "Stump", "Pineapple").pack()
+    field.trace_add("write", lambda *args: settings.set_setting("field", field.get()))
     root.mainloop()
 
 
