@@ -158,6 +158,7 @@ def claim_hive_slot():
     key_press("e")
 
 
+# todo: does not work at night
 def face_hive(enable):
     for _ in range(2):
         for _ in range(4):
@@ -394,6 +395,7 @@ def gui():
     webhook_url = tk.StringVar()
     gather_time = tk.IntVar()
     field = tk.StringVar()
+    field.set(settings.get_setting('field'))
     tk.Label(root, text="Vip Server:").pack()
     ValidatedEntry(root, validate_vip, "vip_url", vip_url).pack()
     tk.Label(root, text="Webhook URL:").pack()
