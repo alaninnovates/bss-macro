@@ -14,15 +14,20 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import importlib
+from util import key_press, import_pdx
 
-cached_patterns = {}
+pdx = import_pdx()
 
 
-def farm_pattern(pattern_name):
-    if pattern_name not in cached_patterns:
-        pattern = importlib.import_module(f"patterns.{pattern_name}")
-        cached_patterns[pattern_name] = pattern
-    else:
-        pattern = cached_patterns[pattern_name]
-    pattern.execute()
+def execute():
+    pdx.mouseDown()
+    for i in range(2):
+        key_press("w", 0.72)
+        key_press("a", 0.1)
+        key_press("s", 0.72)
+        key_press("a", 0.1)
+    for i in range(2):
+        key_press("w", 0.72)
+        key_press("d", 0.1)
+        key_press("s", 0.72)
+        key_press("d", 0.1)

@@ -1,32 +1,44 @@
+#  Stumpy Macro - Easy to use macro for Bee Swarm Simulator
+#  Copyright (C) 2023. Alan Chen
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import datetime
 import multiprocessing
 import os
-import re
 import signal
 import sys
 import typing
 import webbrowser
 import time
 
-import tkinter as tk
-
 import mss
 import pyautogui
+import pywinauto
 from python_imagesearch.imagesearch import imagesearch
 
+import gui
 import paths
+import patterns
 import settings
 import webhook
-from util import key_press, find_image, rotate_camera, zoom_out, is_int
-
-if sys.platform.startswith("win"):
-    import pydirectinput as pdx
-    import pywinauto
-else:
-    import pyautogui as pdx
+from util import key_press, find_image, rotate_camera, zoom_out, import_pdx
 
 import psutil
 from pynput import keyboard
+
+pdx = import_pdx()
 
 
 def exit_macro():
@@ -37,6 +49,7 @@ class DisconnectManager:
     def __init__(self):
         self.connected = False
         self.is_reconnecting = False
+        self.reconnect_attempts = 0
 
     def get_roblox_pid(self):
         running_apps = psutil.process_iter(['pid', 'name'])
@@ -59,13 +72,14 @@ class DisconnectManager:
         return True
 
     def open_roblox(self):
-        # webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
-        # time.sleep(10)
-        # x, y = imagesearch('assets/playbutton.png')
-        # pyautogui.click(x, y)
-        # webbrowser.open(
-        #     'https://www.roblox.com/games/1537690962/x2-Event-Bee-Swarm-Simulator?privateServerLinkCode=54294896913853942846549719787777')
-        webbrowser.open(settings.get_setting('vip_url'))
+        self.reconnect_attempts += 1
+        if self.reconnect_attempts == 1:
+            webbrowser.open(settings.get_setting('vip_url'))
+        elif self.reconnect_attempts == 2:
+            webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
+            time.sleep(10)
+            x, y = imagesearch('assets/playbutton.png')
+            pyautogui.click(x, y)
 
     def activate_roblox(self):
         pid = self.get_roblox_pid()
@@ -75,7 +89,7 @@ class DisconnectManager:
             w.maximize()
             w.set_focus()
         elif sys.platform.startswith('darwin'):
-            os.system("oascript -e 'activate application \"Roblox\"'")
+            os.system("osascript -e 'activate application \"Roblox\"'")
             time.sleep(0.5)
 
     def disconnect_check(self):
@@ -85,20 +99,23 @@ class DisconnectManager:
             self.connected = True
         print(find_image('assets/disconnected.png'), self.is_connected())
         if find_image('assets/disconnected.png') or not self.is_connected():
-            print('Disconnected')
+            send_status_message('Disconnected', 0xff0000)
             self.is_reconnecting = True
             loc = find_image('assets/reconnect.png')
             if loc:
                 x, y = loc[0], loc[1]
                 pyautogui.click(x, y)
                 print(f'Clicked Reconnect ({x}, {y})')
+                send_status_message("Reconnecting", 0xffff00)
             else:
                 if self.close_roblox():
                     print('Closed roblox')
+                    send_status_message("Closed Roblox", 0xffff00)
                 else:
                     print('Could not find roblox')
                 self.open_roblox()
             print('Opened roblox')
+            send_status_message("Opened Roblox", 0xffff00)
             while not self.get_roblox_pid():
                 time.sleep(0.5)
             self.activate_roblox()
@@ -107,6 +124,7 @@ class DisconnectManager:
             claim_hive_slot()
             self.is_reconnecting = False
             self.connected = True
+            send_status_message("Connected", 0x00ff00)
 
 
 disconnect_manager = DisconnectManager()
@@ -143,6 +161,11 @@ class TimeManager:
 
 
 time_manager = TimeManager()
+
+
+def send_status_message(message, color):
+    webhook.send_embed(settings.get_setting('webhook_url'),
+                       description=f'[{datetime.datetime.now().strftime("%H:%M:%S")}] {message}', color=color)
 
 
 def is_e_on_screen():
@@ -193,20 +216,6 @@ def reset():
     key_press("enter")
 
 
-def farm_e_lol():
-    pdx.mouseDown()
-    for i in range(2):
-        key_press("w", 0.72)
-        key_press("a", 0.1)
-        key_press("s", 0.72)
-        key_press("a", 0.1)
-    for i in range(2):
-        key_press("w", 0.72)
-        key_press("d", 0.1)
-        key_press("s", 0.72)
-        key_press("d", 0.1)
-
-
 def do_mondo():
     time.sleep(1.2)
     key_press("space")
@@ -242,7 +251,7 @@ screen = mss.mss()
 
 
 def field_drift_compensation():
-    # this func doesn't work atm
+    # todo: actually make field drift compensation
     pass
     # goal: make saturator in center of screen
     # use wasd keys to position camera
@@ -276,6 +285,35 @@ def field_drift_compensation():
         pdx.keyUp("s")
 
 
+def get_backpack_percent():
+    w, h = 1920, 1080
+    x = w // 2 + 59 + 3
+    y = 6
+    bp_color = pyautogui.pixel(x, y)
+    backpack_percent = 0
+    if bp_color == (105, 0, 0) or not bp_color:  # lte 50%
+        return
+    if bp_color == (153, 204, 0):  # lte 75%
+        if bp_color == (133, 0, 0):  # lte 65%
+            if bp_color == (123, 0, 0):  # lte 60%
+                # todo stuff
+                pass
+            elif bp_color == (0, 0, 0):  # gt 60%
+                # todo stuff
+                pass
+        else:  # gt 65%
+            # todo stuff
+            pass
+    else:  # gt 75%
+        if bp_color == (196, 0, 0):  # lte 90%
+            # todo stuff
+            pass
+        else:  # gt 90%
+            # todo stuff
+            pass
+    return backpack_percent
+
+
 def convert_if_possible():
     if not is_e_on_screen():
         return
@@ -287,6 +325,7 @@ def convert_if_possible():
 
 def macro_sequence():
     print("Starting macro sequence")
+    send_status_message("Starting macro sequence", 0x00ff00)
     while True:
         reset()
         time.sleep(8)
@@ -297,31 +336,38 @@ def macro_sequence():
         time.sleep(1)
         go_to_cannon()
         key_press("e")
-        if time_manager.needs_do_mondo():
+        if settings.get_setting("collect/mondo_buff") and time_manager.needs_do_mondo():
             do_mondo()
             time_manager.did_mondo()
             continue
-        if time_manager.needs_do_clock():
+        if settings.get_setting("collect/clock") and time_manager.needs_do_clock():
             do_clock()
             time_manager.did_clock()
             continue
         field = settings.get_setting('field')
-        webhook.send_embed(settings.get_setting('webhook_url'), description=f"Going to field: {field}", color=0xff0000)
+        send_status_message(f"Going to field: {field}", 0x808080)
         paths.go_to_field(field)
         time.sleep(1)
         # place sprinkler
         key_press("1")
-        webhook.send_embed(settings.get_setting('webhook_url'), description="Gathering", color=0xff0000)
+        gather_time = settings.get_setting('gather_time')
+        send_status_message(f"Gathering: {field}\nTime limit: {gather_time} minutes", 0x22a338)
         start_farm_time = time.time()
-        gather_time_limit = settings.get_setting('gather_time') * 60
+        gather_time_limit = gather_time * 60
+        pattern_name = settings.get_setting('pattern')
+        fill_percent = settings.get_setting('fill_percent')
         while True:
-            farm_e_lol()
+            patterns.farm_pattern(pattern_name)
             # field_drift_compensation()
-            print(time.time(), time.time() - start_farm_time)
+            if get_backpack_percent() >= fill_percent:
+                send_status_message(f"Gathering: Ended\nReason: Backpack limit ({fill_percent}%)", 0x22a338)
+                break
+            # print(time.time(), time.time() - start_farm_time)
             if time.time() - start_farm_time >= gather_time_limit:
+                send_status_message("Gathering: Ended\nReason: Time limit", 0x22a338)
                 break
         pdx.mouseUp()
-        webhook.send_embed(settings.get_setting('webhook_url'), description="Returning to hive", color=0xff0000)
+        send_status_message("Returning to hive", 0x808080)
 
 
 def disconnect_loop():
@@ -334,9 +380,9 @@ def disconnect_loop():
 def run_macro():
     # todo: make the seq_proc restart after a disconnect
     seq_proc = multiprocessing.Process(target=macro_sequence)
-    seq_proc.run()
+    seq_proc.start()
     dc_proc = multiprocessing.Process(target=disconnect_loop)
-    dc_proc.run()
+    dc_proc.start()
     while True:
         if not disconnect_manager.connected:
             seq_proc.kill()
@@ -349,10 +395,9 @@ def watch_for_hotkeys():
 
     def on_press(key):
         nonlocal run_proc, is_running
-        print(key)
         if key == keyboard.Key.f3:
             print("Exiting")
-            webhook.send_embed(settings.get_setting('webhook_url'), description="Exiting macro", color=0xff0000)
+            send_status_message("Exiting macro", 0xffffff)
             if run_proc:
                 run_proc.kill()
             exit_macro()
@@ -361,7 +406,7 @@ def watch_for_hotkeys():
                 print("Macro already running")
                 return
             print("Running macro")
-            webhook.send_embed(settings.get_setting('webhook_url'), description="Running macro", color=0xff0000)
+            send_status_message("Running macro", 0xa8329e)
             run_proc = multiprocessing.Process(target=run_macro)
             run_proc.start()
             is_running = True
@@ -369,51 +414,12 @@ def watch_for_hotkeys():
     keyboard.Listener(on_press=on_press).start()
 
 
-class ValidatedEntry(tk.Entry):
-    def __init__(self, master, vcmd, setting_name: str, setting_var: tk.Variable, **kwargs):
-        self.vcmd = (master.register(vcmd), '%P')
-        self.setting_var = setting_var
-        self.setting_var.set(settings.get_setting(setting_name))
-        self.setting_var.trace_add("write", lambda *args: settings.set_setting(setting_name, self.setting_var.get()))
-        super().__init__(master, textvariable=self.setting_var, validate="key", validatecommand=self.vcmd, **kwargs)
-
-
-vip_regex = r"^((http(s)?):\/\/)?((www|web)\.)?roblox\.com\/games\/(1537690962|4189852503)\/?([" \
-            r"^\/]*)\?privateServerLinkCode=.{32}(\&[^\/]*)*$"
-
-
-def validate_vip(p):
-    pattern = re.compile(vip_regex)
-    return pattern.match(p) is not None
-
-
-def gui():
-    root = tk.Tk()
-    root.geometry("300x300")
-    root.title("Stumpy Macro")
-    vip_url = tk.StringVar()
-    webhook_url = tk.StringVar()
-    gather_time = tk.IntVar()
-    field = tk.StringVar()
-    field.set(settings.get_setting('field'))
-    tk.Label(root, text="Vip Server:").pack()
-    ValidatedEntry(root, validate_vip, "vip_url", vip_url).pack()
-    tk.Label(root, text="Webhook URL:").pack()
-    ValidatedEntry(root, lambda p: p == "" or p.startswith("http"), "webhook_url", webhook_url).pack()
-    tk.Label(root, text="Gather time (mins):").pack()
-    ValidatedEntry(root, lambda p: p != "" and is_int(p), "gather_time", gather_time).pack()
-    tk.Label(root, text="Field:").pack()
-    tk.OptionMenu(root, field, "Pine Tree", "Stump", "Pineapple").pack()
-    field.trace_add("write", lambda *args: settings.set_setting("field", field.get()))
-    root.mainloop()
-
-
 if __name__ == "__main__":
     try:
         print("Starting macro")
-        webhook.send_embed(settings.get_setting('webhook_url'), description="Starting macro gui", color=0xff0000)
+        send_status_message("Starting macro gui", 0x808080)
         watch_for_hotkeys()
-        gui()
+        gui.gui()
         # field_drift_compensation()
     except KeyboardInterrupt:
         print("Macro stopped")
