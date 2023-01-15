@@ -387,14 +387,22 @@ def disconnect_loop():
 
 
 def run_macro():
-    # todo: make the seq_proc restart after a disconnect
     seq_proc = multiprocessing.Process(target=macro_sequence)
     seq_proc.start()
     dc_proc = multiprocessing.Process(target=disconnect_loop)
     dc_proc.start()
+    time.sleep(1)
     while True:
-        if not disconnect_manager.connected:
+        if not disconnect_manager.is_connected():
+            print("Killling seq_proc")
             seq_proc.kill()
+            while not disconnect_manager.is_connected():
+                print("Waiting for reconnect", disconnect_manager.is_connected())
+                time.sleep(1)
+            seq_proc.terminate()
+            print("Restarting seq_proc")
+            seq_proc = multiprocessing.Process(target=macro_sequence)
+            seq_proc.start()
         time.sleep(0.1)
 
 
