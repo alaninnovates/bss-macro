@@ -75,10 +75,11 @@ class DisconnectManager:
         self.reconnect_attempts += 1
         if self.reconnect_attempts == 1:
             webbrowser.open(settings.get_setting('vip_url'))
-        elif self.reconnect_attempts == 2:
+        elif self.reconnect_attempts >= 2:
             webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
             time.sleep(10)
             x, y = imagesearch('assets/playbutton.png')
+            print(f'Clicked Play ({x}, {y})')
             pyautogui.click(x, y)
 
     def activate_roblox(self):
@@ -119,8 +120,16 @@ class DisconnectManager:
             while not self.get_roblox_pid():
                 time.sleep(0.5)
             self.activate_roblox()
+            total_time_waited = 0
             while not self.is_connected():
                 time.sleep(0.5)
+                total_time_waited += 0.5
+                if total_time_waited > 60:
+                    send_status_message("Reconnect Failed\nTook over 60 seconds", 0xff0000)
+                    self.is_reconnecting = False
+                    self.reconnect_attempts = 0
+                    self.disconnect_check()
+                    return
             claim_hive_slot()
             self.is_reconnecting = False
             self.connected = True
