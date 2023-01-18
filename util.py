@@ -17,6 +17,7 @@
 import sys
 import time
 
+import pyautogui
 from python_imagesearch.imagesearch import imagesearch
 
 if sys.platform.startswith("win"):
@@ -25,11 +26,14 @@ else:
     import pyautogui as pdx
 
 
+display_scale = pyautogui.screenshot().width / pyautogui.size().width
+
+
 def find_image(image, precision=0.8):
     s = imagesearch(image, precision)
     if s[0] == -1 or s[1] == -1:
         return None
-    return s
+    return [s[0] // display_scale, s[1] // display_scale]
 
 
 def key_press(key, duration: float = 0):

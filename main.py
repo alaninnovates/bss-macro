@@ -78,7 +78,7 @@ class DisconnectManager:
         elif self.reconnect_attempts >= 2:
             webbrowser.open('https://www.roblox.com/games/1537690962/Bee-Swarm-Simulator')
             time.sleep(10)
-            x, y = imagesearch('assets/playbutton.png')
+            x, y = find_image('assets/playbutton.png')
             print(f'Clicked Play ({x}, {y})')
             pyautogui.click(x, y)
 
@@ -260,17 +260,13 @@ screen = mss.mss()
 
 
 def field_drift_compensation():
-    # todo: actually make field drift compensation
-    pass
-    # goal: make saturator in center of screen
-    # use wasd keys to position camera
     for _ in range(5):
         saturator_pos = find_image("assets/saturator.png", 0.5)
+        print(saturator_pos)
         if not saturator_pos:
             break
         saturator_x, saturator_y = saturator_pos[0], saturator_pos[1]
-        # window_width, window_height = screen.monitors[0]["width"], screen.monitors[0]["height"]
-        window_width, window_height = 1920, 1080
+        window_width, window_height = pyautogui.size()
         print(saturator_x, saturator_y, window_width, window_height)
         win_up = window_height / 2.14
         win_down = window_height / 1.88
