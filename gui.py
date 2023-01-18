@@ -57,7 +57,7 @@ def gather_tab_gui(root):
     field = tk.StringVar()
     field.set(settings.get_setting('field'))
     tk.Label(root, text="Field:").pack()
-    tk.OptionMenu(root, field, "Pine Tree", "Stump", "Pineapple").pack()
+    tk.OptionMenu(root, field, "Pine Tree", "Stump", "Pineapple", "Rose").pack()
     field.trace_add("write", lambda *args: settings.set_setting("field", field.get()))
 
     fill_percent = tk.StringVar()

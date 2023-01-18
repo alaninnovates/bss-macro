@@ -14,7 +14,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from paths.goto import go_to_pine_tree, go_to_stump, go_to_pineapple
+from paths.goto import go_to_pine_tree, go_to_stump, go_to_pineapple, go_to_rose
 from paths.walkfrom import walk_from_pine_tree
 
 
@@ -25,6 +25,8 @@ def go_to_field(field):
         go_to_stump()
     elif field == "Pineapple":
         go_to_pineapple()
+    elif field == "Rose":
+        go_to_rose()
 
 
 def walk_from_field(field):
