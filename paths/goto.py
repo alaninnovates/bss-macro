@@ -56,3 +56,13 @@ def go_to_pineapple():
     key_press("space")
     rotate_camera(4)
     key_press("w", 1)
+
+
+def go_to_rose():
+    time.sleep(0.28)
+    key_press("space")
+    key_press("space")
+    pdx.keyDown("d")
+    time.sleep(2.8)
+    pdx.keyUp("d")
+    key_press("space")
